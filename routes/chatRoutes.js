@@ -3,7 +3,9 @@ const router = express.Router();
 const { protect } = require("../middleware/auth");
 const Chat = require("../models/Chat");
 
+// ==========================
 // CREATE OR GET CHAT
+// ==========================
 router.post("/create/:userId", protect, async (req, res) => {
   try {
     let chat = await Chat.findOne({
@@ -21,6 +23,7 @@ router.post("/create/:userId", protect, async (req, res) => {
       success: true,
       chat
     });
+
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -29,11 +32,14 @@ router.post("/create/:userId", protect, async (req, res) => {
   }
 });
 
-// GET SINGLE CHAT
-router.get("/:roomId", protect, async (req, res) => {
+// ==========================
+// GET SINGLE CHAT (FIX FOR FRONTEND)
+// ==========================
+router.get("/:chatId", protect, async (req, res) => {
   try {
-    const chat = await Chat.findById(req.params.roomId)
-      .populate("participants", "fullName email");
+    const chat = await Chat.findById(req.params.chatId)
+      .populate("participants", "fullName email avatar")
+      .populate("messages.sender", "fullName email avatar");
 
     if (!chat) {
       return res.status(404).json({
@@ -46,6 +52,7 @@ router.get("/:roomId", protect, async (req, res) => {
       success: true,
       chat
     });
+
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -54,12 +61,12 @@ router.get("/:roomId", protect, async (req, res) => {
   }
 });
 
+// ==========================
 // SEND MESSAGE
-router.post("/message", protect, async (req, res) => {
+// ==========================
+router.post("/message/:chatId", protect, async (req, res) => {
   try {
-    const { roomId, content } = req.body;
-
-    const chat = await Chat.findById(roomId);
+    const chat = await Chat.findById(req.params.chatId);
 
     if (!chat) {
       return res.status(404).json({
@@ -70,8 +77,7 @@ router.post("/message", protect, async (req, res) => {
 
     chat.messages.push({
       sender: req.user.id,
-      content,
-      createdAt: new Date()
+      text: req.body.text
     });
 
     await chat.save();
@@ -80,6 +86,7 @@ router.post("/message", protect, async (req, res) => {
       success: true,
       chat
     });
+
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -88,17 +95,20 @@ router.post("/message", protect, async (req, res) => {
   }
 });
 
+// ==========================
 // GET USER CHATS
+// ==========================
 router.get("/", protect, async (req, res) => {
   try {
     const chats = await Chat.find({
       participants: req.user.id
-    }).populate("participants", "fullName email");
+    }).populate("participants", "fullName email avatar");
 
     res.json({
       success: true,
       chats
     });
+
   } catch (error) {
     res.status(500).json({
       success: false,
