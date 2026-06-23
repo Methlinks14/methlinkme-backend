@@ -17,27 +17,74 @@ router.post("/create/:userId", protect, async (req, res) => {
       });
     }
 
-    res.json({ success: true, chat });
+    res.json({
+      success: true,
+      chat
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// GET SINGLE CHAT
+router.get("/:roomId", protect, async (req, res) => {
+  try {
+    const chat = await Chat.findById(req.params.roomId)
+      .populate("participants", "fullName email");
+
+    if (!chat) {
+      return res.status(404).json({
+        success: false,
+        message: "Chat not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      chat
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 });
 
 // SEND MESSAGE
-router.post("/message/:chatId", protect, async (req, res) => {
+router.post("/message", protect, async (req, res) => {
   try {
-    const chat = await Chat.findById(req.params.chatId);
+    const { roomId, content } = req.body;
+
+    const chat = await Chat.findById(roomId);
+
+    if (!chat) {
+      return res.status(404).json({
+        success: false,
+        message: "Chat not found"
+      });
+    }
 
     chat.messages.push({
       sender: req.user.id,
-      text: req.body.text
+      content,
+      createdAt: new Date()
     });
 
     await chat.save();
 
-    res.json({ success: true, chat });
+    res.json({
+      success: true,
+      chat
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 });
 
@@ -48,9 +95,15 @@ router.get("/", protect, async (req, res) => {
       participants: req.user.id
     }).populate("participants", "fullName email");
 
-    res.json({ success: true, chats });
+    res.json({
+      success: true,
+      chats
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 });
 
