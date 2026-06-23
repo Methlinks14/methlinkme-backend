@@ -98,3 +98,4 @@ server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
 app.use("/api/chat", require("./routes/chatRoutes"));
+app.use("/api/payment", require("./routes/paymentRoutes"));
