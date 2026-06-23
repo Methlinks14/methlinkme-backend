@@ -2,13 +2,11 @@ const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const socketIo = require("socket.io");
-const dotenv = require("dotenv");
+require("dotenv").config();
 
-dotenv.config();
-
-// ==========================
+// ======================
 // APP INIT
-// ==========================
+// ======================
 const app = express();
 
 app.use(cors({
@@ -18,22 +16,26 @@ app.use(cors({
 
 app.use(express.json());
 
-// ==========================
+// ======================
 // ROUTES
-// ==========================
-app.use("/api/auth", require("./routes/auth"));
-app.use("/api/users", require("./routes/users"));
+// ======================
+app.use("/api/auth", require("./routes/authRoutes"));
+app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/providers", require("./routes/providerRoutes"));
-app.use("/api/chat", require("./routes/chat"));
+app.use("/api/chat", require("./routes/chatRoutes"));
+app.use("/api/admin", require("./routes/adminRoutes"));
+app.use("/api/payments", require("./routes/paymentRoutes"));
+app.use("/api/services", require("./routes/serviceRoutes"));
+app.use("/api/ratings", require("./routes/ratingRoutes"));
 
-// ==========================
-// CREATE HTTP SERVER
-// ==========================
+// ======================
+// CREATE HTTP SERVER (🔥 FIX)
+// ======================
 const server = http.createServer(app);
 
-// ==========================
-// SOCKET.IO SETUP
-// ==========================
+// ======================
+// SOCKET SETUP
+// ======================
 const io = socketIo(server, {
   cors: {
     origin: "*",
@@ -44,16 +46,13 @@ const io = socketIo(server, {
 io.on("connection", (socket) => {
   console.log("🔌 User connected:", socket.id);
 
-  // JOIN ROOM
   socket.on("joinRoom", (roomId) => {
     socket.join(roomId);
     console.log("📥 Joined room:", roomId);
   });
 
-  // SEND MESSAGE
   socket.on("sendMessage", (data) => {
     const { roomId } = data;
-
     io.to(roomId).emit("receiveMessage", data);
   });
 
@@ -62,9 +61,9 @@ io.on("connection", (socket) => {
   });
 });
 
-// ==========================
-// START SERVER (IMPORTANT FOR RENDER)
-// ==========================
+// ======================
+// START SERVER
+// ======================
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
