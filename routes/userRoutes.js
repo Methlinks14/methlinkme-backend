@@ -24,14 +24,15 @@ router.put('/profile', protect, async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
+// ==========================
+// GET PROFILE
+// ==========================
 router.get('/profile', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
 
-    res.json({
-      success: true,
-      user
-    });
+    res.json({ success: true, user });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -67,12 +68,10 @@ router.post('/save-provider/:providerId', protect, async (req, res) => {
     const alreadySaved = user.savedProviders.includes(providerId);
 
     if (alreadySaved) {
-      // remove provider
       user.savedProviders = user.savedProviders.filter(
         id => id.toString() !== providerId
       );
     } else {
-      // add provider
       user.savedProviders.push(providerId);
     }
 
@@ -89,7 +88,26 @@ router.post('/save-provider/:providerId', protect, async (req, res) => {
 });
 
 // ==========================
-// SEND CONTACT MESSAGE
+// GET SAVED PROVIDERS (FIXED - ONLY ONCE)
+// ==========================
+router.get('/saved-providers', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).populate('savedProviders');
+
+    res.json({
+      success: true,
+      savedProviders: user.savedProviders
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// ==========================
+// CONTACT
 // ==========================
 router.post('/contact', protect, async (req, res) => {
   try {
@@ -107,18 +125,3 @@ router.post('/contact', protect, async (req, res) => {
 });
 
 module.exports = router;
-router.get('/saved-providers', protect, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id).populate('savedProviders');
-
-    res.json({
-      success: true,
-      savedProviders: user.savedProviders
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-});
