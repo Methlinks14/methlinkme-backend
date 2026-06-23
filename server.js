@@ -2,19 +2,38 @@ const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const socketIo = require("socket.io");
-require("dotenv").config();
+const dotenv = require("dotenv");
 
+dotenv.config();
+
+// ==========================
+// APP INIT
+// ==========================
 const app = express();
-app.use(cors());
+
+app.use(cors({
+  origin: "*",
+  credentials: true
+}));
+
 app.use(express.json());
 
-// Routes
+// ==========================
+// ROUTES
+// ==========================
+app.use("/api/auth", require("./routes/auth"));
+app.use("/api/users", require("./routes/users"));
+app.use("/api/providers", require("./routes/providerRoutes"));
 app.use("/api/chat", require("./routes/chat"));
 
-// HTTP SERVER
+// ==========================
+// CREATE HTTP SERVER
+// ==========================
 const server = http.createServer(app);
 
-// SOCKET SETUP
+// ==========================
+// SOCKET.IO SETUP
+// ==========================
 const io = socketIo(server, {
   cors: {
     origin: "*",
@@ -23,12 +42,12 @@ const io = socketIo(server, {
 });
 
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
+  console.log("🔌 User connected:", socket.id);
 
-  // JOIN CHAT ROOM
+  // JOIN ROOM
   socket.on("joinRoom", (roomId) => {
     socket.join(roomId);
-    console.log("Joined room:", roomId);
+    console.log("📥 Joined room:", roomId);
   });
 
   // SEND MESSAGE
@@ -39,13 +58,15 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+    console.log("❌ User disconnected:", socket.id);
   });
 });
 
-// START SERVER
+// ==========================
+// START SERVER (IMPORTANT FOR RENDER)
+// ==========================
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
