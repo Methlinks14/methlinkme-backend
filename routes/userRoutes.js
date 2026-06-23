@@ -107,3 +107,18 @@ router.post('/contact', protect, async (req, res) => {
 });
 
 module.exports = router;
+router.get('/saved-providers', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).populate('savedProviders');
+
+    res.json({
+      success: true,
+      savedProviders: user.savedProviders
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
