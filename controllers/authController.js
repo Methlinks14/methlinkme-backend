@@ -1,14 +1,14 @@
 const User = require('../models/User');
-const Provider = require('../models/Provider');
+const crypto = require('crypto');
 const { generateToken } = require('../middleware/auth');
 const { sendWelcomeEmail, sendPasswordResetEmail } = require('../utils/email');
 const { OAuth2Client } = require('google-auth-library');
-const crypto = require('crypto');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// @desc    Register new user
-// @route   POST /api/auth/register
+// ===============================
+// REGISTER
+// ===============================
 exports.register = async (req, res) => {
   try {
     const { fullName, email, password, location } = req.body;
@@ -17,7 +17,7 @@ exports.register = async (req, res) => {
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'Email already registered'
+        message: "Email already registered"
       });
     }
 
@@ -28,13 +28,14 @@ exports.register = async (req, res) => {
       location
     });
 
-    try { await sendWelcomeEmail(email, fullName); } catch (e) {}
+    try {
+      await sendWelcomeEmail(email, fullName);
+    } catch (e) {}
 
     const token = generateToken(user._id);
 
     res.status(201).json({
       success: true,
-      message: 'Account created successfully',
       token,
       user: {
         id: user._id,
@@ -45,13 +46,19 @@ exports.register = async (req, res) => {
         location: user.location
       }
     });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("REGISTER ERROR:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
 
-// @desc    Login user
-// @route   POST /api/auth/login
+// ===============================
+// LOGIN (FULL SAFE FIX)
+// ===============================
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -59,30 +66,40 @@ exports.login = async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide email and password'
+        message: "Email and password required"
       });
     }
 
-    const user = await User.findOne({ email }).select('+password');
-    if (!user || !(await user.matchPassword(password))) {
+    const user = await User.findOne({ email });
+
+    if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: "Invalid credentials"
+      });
+    }
+
+    // SAFE PASSWORD CHECK
+    const isMatch = await user.matchPassword(password).catch(() => false);
+
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials"
       });
     }
 
     if (!user.isActive) {
       return res.status(403).json({
         success: false,
-        message: 'Account suspended. Contact support.'
+        message: "Account suspended"
       });
     }
 
     const token = generateToken(user._id);
 
-    res.json({
+    return res.json({
       success: true,
-      message: 'Login successful',
       token,
       user: {
         id: user._id,
@@ -93,13 +110,19 @@ exports.login = async (req, res) => {
         location: user.location
       }
     });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("LOGIN ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error during login"
+    });
   }
 };
 
-// @desc    Google OAuth login
-// @route   POST /api/auth/google
+// ===============================
+// GOOGLE AUTH
+// ===============================
 exports.googleAuth = async (req, res) => {
   try {
     const { token } = req.body;
@@ -121,14 +144,16 @@ exports.googleAuth = async (req, res) => {
         avatar: picture,
         isVerified: true
       });
-      try { await sendWelcomeEmail(email, name); } catch (e) {}
+
+      try {
+        await sendWelcomeEmail(email, name);
+      } catch (e) {}
     }
 
     const authToken = generateToken(user._id);
 
     res.json({
       success: true,
-      message: 'Google login successful',
       token: authToken,
       user: {
         id: user._id,
@@ -139,83 +164,119 @@ exports.googleAuth = async (req, res) => {
         location: user.location
       }
     });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("GOOGLE AUTH ERROR:", error);
+    res.status(500).json({
+      success: false,
+      message: "Google authentication failed"
+    });
   }
 };
 
-// @desc    Get current logged in user
-// @route   GET /api/auth/me
+// ===============================
+// GET ME
+// ===============================
 exports.getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
-    res.json({ success: true, user });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// @desc    Forgot password
-// @route   POST /api/auth/forgot-password
-exports.forgotPassword = async (req, res) => {
-  try {
-    const user = await User.findOne({ email: req.body.email });
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'No account with that email'
-      });
-    }
-
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    user.resetPasswordToken = crypto
-      .createHash('sha256')
-      .update(resetToken)
-      .digest('hex');
-    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
-    await user.save();
-
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
-    try { await sendPasswordResetEmail(user.email, resetUrl); } catch (e) {}
 
     res.json({
       success: true,
-      message: 'Password reset email sent'
+      user
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
 
-// @desc    Reset password
-// @route   PUT /api/auth/reset-password/:token
+// ===============================
+// FORGOT PASSWORD
+// ===============================
+exports.forgotPassword = async (req, res) => {
+  try {
+    const user = await User.findOne({ email: req.body.email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+
+    user.resetPasswordToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+
+    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+
+    await user.save();
+
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+
+    try {
+      await sendPasswordResetEmail(user.email, resetUrl);
+    } catch (e) {}
+
+    res.json({
+      success: true,
+      message: "Reset email sent"
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// ===============================
+// RESET PASSWORD
+// ===============================
 exports.resetPassword = async (req, res) => {
   try {
-    const resetPasswordToken = crypto
-      .createHash('sha256')
+    const hashedToken = crypto
+      .createHash("sha256")
       .update(req.params.token)
-      .digest('hex');
+      .digest("hex");
 
     const user = await User.findOne({
-      resetPasswordToken,
+      resetPasswordToken: hashedToken,
       resetPasswordExpire: { $gt: Date.now() }
     });
 
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid or expired reset token'
+        message: "Invalid or expired token"
       });
     }
 
     user.password = req.body.password;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
+
     await user.save();
 
     const token = generateToken(user._id);
-    res.json({ success: true, message: 'Password reset successful', token });
+
+    res.json({
+      success: true,
+      token,
+      message: "Password reset successful"
+    });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
